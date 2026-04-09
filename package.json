@@ -1,0 +1,13 @@
+{
+  "name": "heic-converter",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "heic-convert": "^2.1.0",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.33.4"
+  }
+}
