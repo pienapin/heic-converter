@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import sharp from 'sharp';
-import heicConvert from 'heic-convert';
+import heicDecode from 'heic-decode';
 
 export const config = {
   api: {
@@ -10,19 +10,13 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // CORS headers so you can call this from anywhere
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Accept ?url= as query param OR { url } in POST body
   const imageUrl = req.query.url || req.body?.url;
-
-  if (!imageUrl) {
-    return res.status(400).json({ error: 'Missing required parameter: url' });
-  }
+  if (!imageUrl) return res.status(400).json({ error: 'Missing required parameter: url' });
 
   const format = (req.query.format || req.body?.format || 'webp').toLowerCase();
   if (!['webp', 'jpg', 'jpeg'].includes(format)) {
@@ -30,10 +24,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Fetch the image from the provided URL
+    // 1. Fetch the image
     const response = await fetch(imageUrl, {
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0' }, // some hosts block bot agents
+      headers: { 'User-Agent': 'Mozilla/5.0' },
     });
 
     if (!response.ok) {
@@ -42,38 +36,42 @@ export default async function handler(req, res) {
       });
     }
 
-    const contentType = response.headers.get('content-type') || '';
     const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') || '';
 
-    let inputBuffer = buffer;
-
-    // 2. If HEIC/HEIF, convert to a raw JPEG buffer first
     const isHeic =
       contentType.includes('heic') ||
       contentType.includes('heif') ||
       imageUrl.toLowerCase().includes('.heic') ||
       imageUrl.toLowerCase().includes('.heif');
 
+    let outputBuffer;
+
     if (isHeic) {
-      inputBuffer = await heicConvert({
-        buffer,
-        format: 'JPEG',   // heic-convert outputs JPEG; sharp handles the rest
-        quality: 1,
-      });
+      // 2a. Decode HEIC → raw RGBA pixels using pure-JS heic-decode
+      const { width, height, data } = await heicDecode({ buffer });
+
+      // 3a. Feed raw pixels into sharp
+      const outputFormat = format === 'jpg' ? 'jpeg' : format;
+      outputBuffer = await sharp(Buffer.from(data), {
+        raw: { width, height, channels: 4 },
+      })
+        [outputFormat]({ quality: 85 })
+        .toBuffer();
+
+    } else {
+      // 2b. Non-HEIC: let sharp handle it directly
+      const outputFormat = format === 'jpg' ? 'jpeg' : format;
+      outputBuffer = await sharp(buffer)
+        [outputFormat]({ quality: 85 })
+        .toBuffer();
     }
 
-    // 3. Convert to target format with sharp
-    const outputFormat = format === 'jpg' ? 'jpeg' : format;
-    const converted = await sharp(inputBuffer)
-      [outputFormat]({ quality: 85 })
-      .toBuffer();
-
-    // 4. Return the image
-    const mimeType = outputFormat === 'webp' ? 'image/webp' : 'image/jpeg';
+    const mimeType = format === 'webp' ? 'image/webp' : 'image/jpeg';
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `inline; filename="converted.${format}"`);
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.status(200).send(converted);
+    return res.status(200).send(outputBuffer);
 
   } catch (err) {
     console.error(err);
