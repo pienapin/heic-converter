@@ -2,8 +2,10 @@
   "name": "heic-converter",
   "version": "1.0.0",
   "type": "module",
+  "main": "server.js",
   "dependencies": {
+    "express": "^4.18.2",
     "node-fetch": "^3.3.2",
-    "wasm-vips": "^0.0.10"
+    "sharp": "^0.33.4"
   }
 }
