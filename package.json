@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "heic-decode": "^1.0.2",
     "node-fetch": "^3.3.2",
-    "sharp": "^0.33.4"
+    "wasm-vips": "^0.0.10"
   }
 }

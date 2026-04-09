@@ -1,8 +1,8 @@
 {
   "functions": {
     "api/convert.js": {
-      "memory": 1024,
-      "maxDuration": 30
+      "memory": 2048,
+      "maxDuration": 60
     }
   }
 }
